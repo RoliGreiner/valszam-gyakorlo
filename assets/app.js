@@ -252,7 +252,7 @@ function viewTheory(args) {
 }
 
 /* ───────────────────────── Kártyák ───────────────────────── */
-const fc = { topics: new Set(TOPICS.map((t) => t.id)), types: new Set(["def", "tetel", "kepl"]), dir: "term", onlyHard: false, queue: [], total: 0, known: 0, flipped: false, enter: "", busy: false };
+const fc = { topics: new Set(TOPICS.map((t) => t.id)), types: new Set(["def", "tetel", "kepl"]), dir: "term", onlyHard: false, settingsOpen: window.innerWidth > 860, queue: [], total: 0, known: 0, flipped: false, enter: "", busy: false };
 function fcBuild() {
   const hist = store.get("fcHist", {});
   let cards = CARDS.filter((c) => fc.topics.has(c.topic) && fc.types.has(c.type));
@@ -279,7 +279,9 @@ function fcRender() {
   mount(`
     <div class="fc-wrap">
       <h1>Kártyák</h1>
-      <div class="panel">
+      <details class="panel fc-settings" id="fcSettings" ${fc.settingsOpen ? "open" : ""}>
+        <summary><span>⚙ Beállítások</span><span class="small muted">${fc.topics.size === TOPICS.length ? "minden témakör" : fc.topics.size + " témakör"} · ${fc.types.size === 3 ? "minden típus" : [...fc.types].map((t) => typeName[t].toLowerCase()).join(", ")} · ${fc.dir === "term" ? "fogalom → leírás" : "leírás → fogalom"}</span></summary>
+        <div class="fc-settings-body">
         <div class="filter-row"><span class="flabel">Témakör</span><div class="chips" id="fcTopics">${TOPICS.map((t) => `<button class="chip ${fc.topics.has(t.id) ? "on" : ""}" data-t="${t.id}">${t.name}</button>`).join("")}</div></div>
         <div class="filter-row"><span class="flabel">Típus</span><div class="chips" id="fcTypes">${["def", "tetel", "kepl"].map((t) => `<button class="chip ${fc.types.has(t) ? "on" : ""}" data-t="${t}"><span class="dot ${t}"></span>${{ def: "Definíciók", tetel: "Tételek", kepl: "Képletek" }[t]}</button>`).join("")}</div></div>
         <div class="row" style="margin-top:12px">
@@ -292,15 +294,18 @@ function fcRender() {
           <button class="btn" id="fcShuffle">↻ Újrakezdés</button>
           <button class="btn bad" id="fcReset" ${knownAll ? "" : "disabled"} title="Az összes kártya „tudott” jelölésének törlése">Haladás nullázása</button>
         </div>
-      </div>
+        </div>
+      </details>
       ${card ? `
         <div class="row small muted" style="margin-top:18px">
           <span>Ebben a körben: ${fc.known} / ${fc.total} tudva · hátravan ${fc.queue.length}</span><span class="spacer"></span><span>Összesen tudott: ${knownAll} / ${CARDS.length}</span>
         </div>
         <div class="progress" style="margin-top:6px"><div style="width:${fc.total ? (100 * fc.known) / fc.total : 0}%"></div></div>
         <div class="flip ${fc.flipped ? "flipped" : ""} ${fc.enter}" id="fcCard" tabindex="0" role="button" aria-label="Kártya megfordítása">
+          <div class="swipe-hint yes" aria-hidden="true">✓ TUDTAM</div>
+          <div class="swipe-hint no" aria-hidden="true">NEM TUDTAM ✗</div>
           <div class="flip-inner">
-            <div class="face front"><div class="topline"><span class="badge ${card.type}">${typeName[card.type]}</span><span class="small muted">${topicName(card.topic)}</span></div>${front}<div class="hint">Kattints vagy <span class="kbd">Space</span> a megfordításhoz</div></div>
+            <div class="face front"><div class="topline"><span class="badge ${card.type}">${typeName[card.type]}</span><span class="small muted">${topicName(card.topic)}</span></div>${front}<div class="hint"><span class="hint-desktop">Kattints vagy <span class="kbd">Space</span> a megfordításhoz · a kártya húzható is</span><span class="hint-touch">Koppints a megfordításhoz · húzd jobbra, ha tudtad, balra, ha nem</span></div></div>
             <div class="face back"><div class="topline"><span class="badge ${card.type}">${typeName[card.type]}</span><span class="small muted">${topicName(card.topic)}</span></div>${back}</div>
           </div>
         </div>
@@ -319,6 +324,7 @@ function fcRender() {
     if (fc.topics.has(t)) { if (fc.topics.size > 1) fc.topics.delete(t); } else fc.topics.add(t);
     fcBuild(); fcRender();
   }));
+  document.getElementById("fcSettings").addEventListener("toggle", (e) => { fc.settingsOpen = e.target.open; });
   app.querySelectorAll("#fcTypes .chip").forEach((b) => b.addEventListener("click", () => {
     const t = b.dataset.t;
     if (fc.types.has(t)) { if (fc.types.size > 1) fc.types.delete(t); } else fc.types.add(t);
@@ -338,7 +344,7 @@ function fcRender() {
 
   const flip = () => { fc.flipped = !fc.flipped; document.getElementById("fcCard").classList.toggle("flipped", fc.flipped); };
   fc.enter = "";
-  const answer = (ok) => {
+  const answer = (ok, swiped) => {
     if (fc.busy) return;
     fc.busy = true;
     const hst = store.get("fcHist", {});
@@ -349,10 +355,55 @@ function fcRender() {
     else fc.queue.splice(Math.min(fc.queue.length, 3 + Math.floor(Math.random() * 4)), 0, card); /* hamarosan újra jön */
     fc.flipped = false;
     const el = document.getElementById("fcCard");
-    el.classList.add(ok ? "out-right" : "out-left");
+    if (swiped) {
+      /* a húzott helyzetből repül tovább ugyanabba az irányba */
+      el.style.transition = "transform .25s ease-out, opacity .25s";
+      el.style.transform = `translateX(${ok ? "" : "-"}120vw) rotate(${ok ? 24 : -24}deg)`;
+      el.style.opacity = "0";
+    } else el.classList.add(ok ? "out-right" : "out-left");
     setTimeout(() => { fc.busy = false; fc.enter = "card-in"; fcRender(); }, reduceMotion() ? 0 : 230);
   };
-  document.getElementById("fcCard").addEventListener("click", flip);
+  /* húzás (swipe): egér és érintés, mindkettő pointer eseményekkel */
+  const cardEl = document.getElementById("fcCard");
+  const TH = Math.min(110, window.innerWidth * 0.22); /* ennyi elmozdulás után számít válasznak */
+  let sx = 0, sy = 0, dx = 0, st = 0, pid = null, dragging = false, moved = false;
+  const setDrag = (x) => {
+    cardEl.style.transform = x ? `translateX(${x}px) rotate(${x / 18}deg)` : "";
+    cardEl.style.setProperty("--swipe", Math.max(-1, Math.min(1, x / TH)).toFixed(3));
+  };
+  cardEl.addEventListener("pointerdown", (e) => {
+    if (fc.busy || (e.pointerType === "mouse" && e.button !== 0)) return;
+    sx = e.clientX; sy = e.clientY; dx = 0; st = performance.now();
+    pid = e.pointerId; dragging = true; moved = false;
+  });
+  cardEl.addEventListener("pointermove", (e) => {
+    if (!dragging || e.pointerId !== pid) return;
+    const mx = e.clientX - sx, my = e.clientY - sy;
+    if (!moved) {
+      if (Math.abs(mx) < 8 && Math.abs(my) < 8) return;
+      if (Math.abs(my) > Math.abs(mx)) { dragging = false; return; } /* függőleges: hagyjuk görgetni */
+      moved = true;
+      try { cardEl.setPointerCapture(pid); } catch (err) { /* nem kritikus */ }
+      cardEl.classList.add("dragging");
+    }
+    dx = mx;
+    setDrag(dx);
+  });
+  const endDrag = () => {
+    if (!dragging) return;
+    dragging = false;
+    if (!moved) return; /* sima koppintás: a click esemény fordítja meg */
+    cardEl.classList.remove("dragging");
+    const fast = Math.abs(dx) > 40 && Math.abs(dx) / (performance.now() - st) > 0.6; /* gyors pöccintés */
+    if (Math.abs(dx) > TH || fast) answer(dx > 0, true);
+    else setDrag(0);
+  };
+  cardEl.addEventListener("pointerup", endDrag);
+  cardEl.addEventListener("pointercancel", endDrag);
+  cardEl.addEventListener("click", () => {
+    if (moved) { moved = false; return; } /* húzás után ne forduljon meg */
+    flip();
+  });
   document.getElementById("fcYes").addEventListener("click", () => answer(true));
   document.getElementById("fcNo").addEventListener("click", () => answer(false));
   keyHandler = (e) => {
