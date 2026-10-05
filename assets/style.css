@@ -347,3 +347,11 @@ html.theme-anim, html.theme-anim *, html.theme-anim *::before, html.theme-anim *
 .face > div:not(.topline):not(.hint):not(.big) { font-size: 1.08rem; max-width: 900px; margin: 0 auto; width: 100%; }
 .q-text { font-size: 1.2rem; }
 @media (max-width: 640px) { .face { padding: 36px 20px; } .face .big { font-size: 1.45rem; } }
+
+/* tartalomjegyzék számlálói */
+.toc-n small { font-weight: 600; opacity: .6; margin-left: 1px; }
+.side button.toc.empty { opacity: .45; cursor: default; }
+.side button.toc.empty:hover { background: transparent; color: var(--muted); }
+.toc-n { transition: background-color .2s, color .2s; }
+@keyframes bump { 0% { transform: scale(1); } 40% { transform: scale(1.3); background: var(--accent); color: var(--accent-text); } 100% { transform: scale(1); } }
+.toc-n.bump { animation: bump .5s var(--ease); }

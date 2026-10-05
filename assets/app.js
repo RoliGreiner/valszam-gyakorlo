@@ -139,7 +139,8 @@ function theoryData() {
     const probs = th.view === "detail" && th.types.includes("ex")
       ? PROBLEMS.filter((p) => p.topic === t.id && (!q || (p.title + " " + p.src).toLowerCase().includes(q)))
       : [];
-    return { t, groups, probs, n: sum(groups.map((g) => g.cards.length)) + probs.length };
+    const nc = sum(groups.map((g) => g.cards.length));
+    return { t, groups, probs, nc, n: nc + probs.length };
   }).filter((x) => x.n);
 }
 function renderTheoryContent() {
@@ -158,9 +159,26 @@ function renderTheoryContent() {
     </section>`).join("")
     : `<div class="empty">Nincs találat a megadott szűrőkkel.</div>`;
   renderMath(content);
+  /* tartalomjegyzék: minden témakör látszik, a szám a szűrés utáni elemszám (szűréskor "látható/összes") */
   const toc = document.getElementById("tToc");
-  toc.innerHTML = data.map(({ t, n }) => `<button class="toc" data-t="${t.id}"><span class="t-ic">${t.icon}</span><span class="toc-name">${t.name}</span><span class="toc-n">${n}</span></button>`).join("");
-  toc.querySelectorAll(".toc").forEach((b) => b.addEventListener("click", () => {
+  const allTypes = th.view === "formula" ? ["def", "tetel", "kepl"] : ["def", "tetel", "kepl", "ex"];
+  const filtered = !!th.q.trim() || th.weeks.length < 4 || !allTypes.every((x) => th.types.includes(x));
+  const prev = th.counts || {};
+  th.counts = {};
+  toc.innerHTML = TOPICS.map((t) => {
+    const d = data.find((x) => x.t.id === t.id);
+    const n = d ? d.n : 0;
+    const totalCards = CARDS.filter((c) => c.topic === t.id && (th.view !== "formula" || formulaOf(c))).length;
+    const totalProbs = th.view === "detail" ? PROBLEMS.filter((p) => p.topic === t.id).length : 0;
+    const total = totalCards + totalProbs;
+    th.counts[t.id] = n;
+    const bump = t.id in prev && prev[t.id] !== n ? " bump" : "";
+    const tip = d ? `${d.nc} fogalom${d.probs.length ? ` + ${d.probs.length} példafeladat` : ""}` : "nincs találat a szűrőkkel";
+    return `<button class="toc${n ? "" : " empty"}" data-t="${t.id}" title="${tip}" ${n ? "" : "disabled"}>
+      <span class="t-ic">${t.icon}</span><span class="toc-name">${t.name}</span>
+      <span class="toc-n${bump}">${n}${filtered ? `<small>/${total}</small>` : ""}</span></button>`;
+  }).join("");
+  toc.querySelectorAll(".toc:not(.empty)").forEach((b) => b.addEventListener("click", () => {
     const el = document.getElementById("sec-" + b.dataset.t);
     window.scrollTo({ top: el.getBoundingClientRect().top + scrollY - 80, behavior: "smooth" });
   }));
