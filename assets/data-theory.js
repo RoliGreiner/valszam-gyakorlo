@@ -180,6 +180,40 @@ const CARDS = [
     text: R`„visszatevéssel / független / x%-a hibás” + rögzített darabszám → **binomiális**; „visszatevés nélkül” véges készletből → **hipergeometriai**; „hányadikra lesz az első…” → **geometriai**; „átlagosan … időegység alatt” → **Poisson**.` },
 ];
 
+/* Alcsoportok témakörönként (a Tudástár és a Képletlap ezek szerint csoportosít). */
+const SUBGROUPS = {
+  esemeny: [
+    ["Alapfogalmak", ["elemi", "esemenyter", "esemeny", "biztos"]],
+    ["Műveletek eseményekkel", ["osszeg", "szorzat", "komplementer", "kulonbseg", "demorgan"]],
+    ["Események kapcsolata", ["kizaro", "resz", "teljes_rsz"]],
+  ],
+  kombi: [
+    ["Sorba rendezés (permutáció)", ["perm", "ismperm", "kor"]],
+    ["Kiválasztás (variáció, kombináció)", ["var", "ismvar", "komb", "ismkomb", "binsym"]],
+  ],
+  klassz: [
+    ["Axiómák és számolási szabályok", ["axiomak", "komplP", "osszegP", "kulP", "monoton"]],
+    ["Klasszikus mező és mintavétel", ["klasszikus", "visszatevesses", "visszateves_nelkul", "relgyak"]],
+    ["Geometriai mező", ["geomtér"]],
+  ],
+  felt: [
+    ["Feltételes valószínűség", ["feltP", "szorzas", "feltkompl"]],
+    ["Függetlenség", ["fuggetlen", "fuggkompl", "paronkent", "teljesfugg", "kizaro_fugg"]],
+  ],
+  bayes: [
+    ["Tételek és módszer", ["teljesP", "bayesT", "apriori", "fa"]],
+  ],
+  valvalt: [
+    ["Eloszlás és eloszlásfüggvény", ["valvalt", "diszkret", "eloszlas", "eloszlasfv", "eloszlasfv_tul", "eloszlasfv_hasznal", "modusz"]],
+    ["Várható érték", ["varhato", "varhato_g", "varhato_lin"]],
+    ["Szórás", ["szorasnegyzet", "steiner", "szoras", "szoras_lin"]],
+  ],
+  eloszl: [
+    ["Az eloszlások", ["indikator", "binomialis", "hipergeo", "geometriai", "poisson"]],
+    ["Tulajdonságok és közelítések", ["orokifju", "poisson_skala", "poisson_modusz", "binom_poisson", "hyp_binom", "felismeres"]],
+  ],
+};
+
 /* ───────── Feleletválasztós kérdések: az első opció a helyes (megjelenítéskor keverjük) ───────── */
 const MCQ = [
   /* Eseményalgebra */
