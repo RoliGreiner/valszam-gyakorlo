@@ -154,11 +154,11 @@ details.example .body { padding: 0 16px 14px; }
 .answers { margin: 8px 0 0; padding-left: 18px; }
 
 /* ---------- kártyák ---------- */
-.fc-wrap { max-width: 720px; margin: 0 auto; }
+.fc-wrap { max-width: none; }
 .flip { perspective: 1400px; cursor: pointer; margin: 18px 0; }
-.flip-inner { position: relative; min-height: 300px; transition: transform .5s cubic-bezier(.2,.7,.2,1); transform-style: preserve-3d; display: grid; }
+.flip-inner { position: relative; min-height: 340px; transition: transform .5s cubic-bezier(.2,.7,.2,1); transform-style: preserve-3d; display: grid; }
 .flip.flipped .flip-inner { transform: rotateY(180deg); }
-.face { grid-area: 1 / 1; backface-visibility: hidden; -webkit-backface-visibility: hidden; background: var(--surface); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--shadow); padding: 28px; display: flex; flex-direction: column; justify-content: center; gap: 10px; min-height: 300px; }
+.face { grid-area: 1 / 1; backface-visibility: hidden; -webkit-backface-visibility: hidden; background: var(--surface); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--shadow); padding: 28px; display: flex; flex-direction: column; justify-content: center; gap: 10px; min-height: 340px; }
 .face.back { transform: rotateY(180deg); background: linear-gradient(180deg, var(--surface), var(--surface-2)); }
 .face .big { font-size: 1.5rem; font-weight: 700; text-align: center; }
 .face .hint { position: absolute; bottom: 12px; left: 0; right: 0; text-align: center; font-size: .8rem; color: var(--muted); }
@@ -168,9 +168,9 @@ details.example .body { padding: 0 16px 14px; }
 .kbd { font-family: ui-monospace, monospace; font-size: .78rem; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 5px; padding: 0 5px; color: var(--muted); }
 
 /* ---------- kvíz ---------- */
-.quiz-wrap { max-width: 760px; margin: 0 auto; }
+.quiz-wrap { max-width: none; }
 .q-text { font-size: 1.12rem; font-weight: 600; margin: 14px 0 16px; }
-.opts { display: flex; flex-direction: column; gap: 10px; }
+.opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 12px; }
 .opt { text-align: left; border: 1.5px solid var(--border); background: var(--surface); color: var(--text); font: inherit; padding: 12px 16px; border-radius: 12px; cursor: pointer; display: flex; gap: 12px; align-items: flex-start; }
 .opt:hover:not(:disabled) { border-color: var(--accent); }
 .opt .letter { flex: none; width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; background: var(--surface-2); font-weight: 700; font-size: .85rem; color: var(--muted); }
@@ -340,3 +340,10 @@ html.theme-anim, html.theme-anim *, html.theme-anim *::before, html.theme-anim *
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
+
+/* széles kártya és kvíz: nagyobb betű, kényelmesebb kitöltés */
+.face { padding: 40px 48px; }
+.face .big { font-size: 1.8rem; }
+.face > div:not(.topline):not(.hint):not(.big) { font-size: 1.08rem; max-width: 900px; margin: 0 auto; width: 100%; }
+.q-text { font-size: 1.2rem; }
+@media (max-width: 640px) { .face { padding: 36px 20px; } .face .big { font-size: 1.45rem; } }

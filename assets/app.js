@@ -272,6 +272,7 @@ function fcRender() {
           <label class="check small"><input type="checkbox" id="fcHard" ${fc.onlyHard ? "checked" : ""}> Csak a még nem tudott kártyák</label>
           <span class="spacer"></span>
           <button class="btn" id="fcShuffle">↻ Újrakezdés</button>
+          <button class="btn bad" id="fcReset" ${knownAll ? "" : "disabled"} title="Az összes kártya „tudott” jelölésének törlése">Haladás nullázása</button>
         </div>
       </div>
       ${card ? `
@@ -308,6 +309,11 @@ function fcRender() {
   app.querySelectorAll("#fcDir button").forEach((b) => b.addEventListener("click", () => { fc.dir = b.dataset.d; fc.flipped = false; fcRender(); }));
   document.getElementById("fcHard").addEventListener("change", (e) => { fc.onlyHard = e.target.checked; fcBuild(); fcRender(); });
   document.getElementById("fcShuffle").addEventListener("click", () => { fcBuild(); fcRender(); });
+  document.getElementById("fcReset").addEventListener("click", () => {
+    if (!confirm(`Biztosan nullázod a haladást? Mind a ${knownAll} tudottnak jelölt kártya újra „nem tudott” lesz.`)) return;
+    store.set("fcHist", {});
+    fcBuild(); fcRender();
+  });
   const again = document.getElementById("fcAgain");
   if (again) again.addEventListener("click", () => { fcBuild(); fcRender(); });
   if (!card) { keyHandler = null; return; }
