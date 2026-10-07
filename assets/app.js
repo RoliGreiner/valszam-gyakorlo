@@ -37,17 +37,23 @@ function mount(html) {
 
 /* ───────────────────────── útválasztás ───────────────────────── */
 let keyHandler = null;
+let viewCleanup = null;
 function route() {
+  if (viewCleanup) { viewCleanup(); viewCleanup = null; }
   const parts = (location.hash.replace(/^#\/?/, "") || "").split("/");
   const name = parts[0] || "";
   document.querySelectorAll("#nav a").forEach((a) => a.classList.toggle("active", a.dataset.route === name));
   keyHandler = null;
   routeChanged = true;
-  const views = { "": viewHome, tudastar: viewTheory, kartyak: viewFlash, kviz: viewQuiz, szamolas: viewCalc };
+  const views = { "": viewHome, tudastar: viewTheory, kartyak: viewFlash, kviz: viewQuiz, szamolas: viewCalc, zh: viewZH };
   (views[name] || viewHome)(parts.slice(1));
 }
 window.addEventListener("hashchange", route);
 const topbar = document.querySelector(".topbar");
+/* a ragadós (sticky) ZH-sáv a fejléc alá kerüljön */
+const setTopbarVar = () => document.documentElement.style.setProperty("--tb", topbar.offsetHeight + "px");
+window.addEventListener("resize", setTopbarVar);
+setTopbarVar();
 window.addEventListener("scroll", () => topbar.classList.toggle("scrolled", scrollY > 4), { passive: true });
 document.addEventListener("keydown", (e) => {
   if (keyHandler && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) keyHandler(e);
@@ -69,13 +75,14 @@ function viewHome() {
   mount(`
     <section class="hero">
       <h1>Valószínűségszámítás gyakorló</h1>
-      <p>Az 1–4. heti gyakorlatok anyaga egy helyen: definíciók és tételek, kártyák a magoláshoz, feleletválasztós kvíz és számolós feladatok fix vagy véletlen számokkal.</p>
+      <p>Az 1–5. heti gyakorlatok anyaga egy helyen: definíciók és tételek, kártyák a magoláshoz, feleletválasztós kvíz, számolós feladatok fix vagy véletlen számokkal, és korábbi ZH-k részletes levezetéssel.</p>
     </section>
     <div class="tiles">
-      <a class="tile" href="#/tudastar"><div class="ic">📖</div><h3>Tudástár</h3><p>Minden definíció, tétel és képlet témakörönként, kidolgozott példafeladatokkal.</p><div class="count">${CARDS.length} fogalom · ${PROBLEMS.length} példa</div></a>
+      <a class="tile" href="#/tudastar"><div class="ic">📖</div><h3>Tudástár</h3><p>Minden definíció, tétel és képlet témakörönként, kidolgozott példafeladatokkal.</p><div class="count">${CARDS.length} fogalom · ${PROBLEMS.length + EXAMPLES.length} példa</div></a>
       <a class="tile" href="#/kartyak"><div class="ic">🃏</div><h3>Kártyák</h3><p>Fordítsd meg a kártyát, és jelöld, tudtad-e. A nem tudott kártyák visszakerülnek a pakliba.</p><div class="count">${CARDS.length} kártya</div></a>
       <a class="tile" href="#/kviz"><div class="ic">✅</div><h3>Feleletválasztós kvíz</h3><p>Elsősorban definíciók és tételek, azonnali visszajelzéssel és magyarázattal.</p><div class="count">${MCQ.length} kérdés + ${CARDS.length} generált${best ? ` · legjobb: ${best}%` : ""}</div></a>
       <a class="tile" href="#/szamolas"><div class="ic">🧮</div><h3>Számolós feladatok</h3><p>A gyakorlatok feladatai eredeti számokkal, vagy minden alkalommal új, véletlen számokkal.</p><div class="count">${PROBLEMS.length} feladattípus${Object.keys(solved).length ? ` · ${Object.keys(solved).length} megoldva` : ""}</div></a>
+      <a class="tile tile-zh" href="#/zh"><div class="ic">🎓</div><h3>ZH-felkészülés</h3><p>Korábbi zárthelyik segítség nélkül (időre, pontozással) vagy lépésenkénti levezetéssel és ábrákkal.</p><div class="count">${EXAMS.length} korábbi ZH + véletlen próba-ZH</div></a>
     </div>
     <h2>Témakörök</h2>
     <div class="topics-overview">
@@ -90,9 +97,12 @@ const TYPE_FILTERS = [
   { id: "kepl", label: "Képletek" },
   { id: "ex", label: "Példafeladatok" },
 ];
-const th = Object.assign({ view: "detail", types: ["def", "tetel", "kepl", "ex"], weeks: [1, 2, 3, 4] }, store.get("theory", {}));
+const WEEKS = [...new Set(TOPICS.map((t) => t.week))].sort((x, y) => x - y);
+const th = Object.assign({ view: "detail", types: ["def", "tetel", "kepl", "ex"], weeks: [...WEEKS], known: [1, 2, 3, 4] }, store.get("theory", {}));
+/* az új hetek akkor is jelenjenek meg, ha a szűrőt korábban elmentettük */
+WEEKS.forEach((w) => { if (!th.known.includes(w)) { th.known.push(w); if (!th.weeks.includes(w)) th.weeks.push(w); } });
 th.q = "";
-const thSave = () => store.set("theory", { view: th.view, types: th.types, weeks: th.weeks });
+const thSave = () => store.set("theory", { view: th.view, types: th.types, weeks: th.weeks, known: th.known });
 
 function exampleHtml(pr, i) {
   const b = pr.build(pr.fixed);
@@ -100,9 +110,19 @@ function exampleHtml(pr, i) {
     <div class="body">
       <div>${b.text}</div>
       <div class="solution"><h4>Megoldás</h4>${b.sol}
+        ${(b.figs || []).length ? `<div class="figs">${b.figs.join("")}</div>` : ""}
         <ul class="answers">${b.parts.map((p) => `<li><b>${esc(p.label)}:</b> ${fmt(p.ans)}</li>`).join("")}</ul>
       </div>
       <p class="small"><a href="#/szamolas/${pr.id}/random">Gyakorold véletlen számokkal →</a></p>
+    </div></details>`;
+}
+/* nem generált, kidolgozott példa (examples.js) */
+function staticExampleHtml(e, i) {
+  const figs = e.figs ? e.figs() : [];
+  return `<details class="example anim-item" style="--i:${i}"><summary>${e.title} <span class="badge">${e.src}</span></summary>
+    <div class="body">
+      <div>${e.text}</div>
+      <div class="solution"><h4>Megoldás</h4>${e.sol}${figs.length ? `<div class="figs">${figs.join("")}</div>` : ""}</div>
     </div></details>`;
 }
 /* A képletlapon a kártya kiemelt ($$…$$) képletei, ha nincsenek, tételeknél/képleteknél a szöveg. */
@@ -136,8 +156,9 @@ function theoryData() {
         .filter((x) => th.view !== "formula" || x.f);
       return { name, cards };
     }).filter((g) => g.cards.length);
+    const exMatch = (x) => !q || (x.title + " " + x.src).toLowerCase().includes(q);
     const probs = th.view === "detail" && th.types.includes("ex")
-      ? PROBLEMS.filter((p) => p.topic === t.id && (!q || (p.title + " " + p.src).toLowerCase().includes(q)))
+      ? [...PROBLEMS.filter((p) => p.topic === t.id && exMatch(p)).map((p) => ({ p })), ...EXAMPLES.filter((e) => e.topic === t.id && exMatch(e)).map((e) => ({ e }))]
       : [];
     const nc = sum(groups.map((g) => g.cards.length));
     return { t, groups, probs, nc, n: nc + probs.length };
@@ -155,21 +176,21 @@ function renderTheoryContent() {
         ${th.view === "formula"
           ? `<div class="flist">${g.cards.map(({ c, f }) => formulaRowHtml(c, f, i++)).join("")}</div>`
           : `<div class="cards">${g.cards.map(({ c }) => cardHtml(c, i++)).join("")}</div>`}`).join("")}
-      ${probs.length ? `<h3 class="subgroup">Példafeladatok a gyakorlatokról</h3><div class="examples">${probs.map((p) => exampleHtml(p, i++)).join("")}</div>` : ""}
+      ${probs.length ? `<h3 class="subgroup">Példafeladatok a gyakorlatokról</h3><div class="examples">${probs.map((x) => (x.p ? exampleHtml(x.p, i++) : staticExampleHtml(x.e, i++))).join("")}</div>` : ""}
     </section>`).join("")
     : `<div class="empty">Nincs találat a megadott szűrőkkel.</div>`;
   renderMath(content);
   /* tartalomjegyzék: minden témakör látszik, a szám a szűrés utáni elemszám (szűréskor "látható/összes") */
   const toc = document.getElementById("tToc");
   const allTypes = th.view === "formula" ? ["def", "tetel", "kepl"] : ["def", "tetel", "kepl", "ex"];
-  const filtered = !!th.q.trim() || th.weeks.length < 4 || !allTypes.every((x) => th.types.includes(x));
+  const filtered = !!th.q.trim() || th.weeks.length < WEEKS.length || !allTypes.every((x) => th.types.includes(x));
   const prev = th.counts || {};
   th.counts = {};
   toc.innerHTML = TOPICS.map((t) => {
     const d = data.find((x) => x.t.id === t.id);
     const n = d ? d.n : 0;
     const totalCards = CARDS.filter((c) => c.topic === t.id && (th.view !== "formula" || formulaOf(c))).length;
-    const totalProbs = th.view === "detail" ? PROBLEMS.filter((p) => p.topic === t.id).length : 0;
+    const totalProbs = th.view === "detail" ? PROBLEMS.filter((p) => p.topic === t.id).length + EXAMPLES.filter((e) => e.topic === t.id).length : 0;
     const total = totalCards + totalProbs;
     th.counts[t.id] = n;
     const bump = t.id in prev && prev[t.id] !== n ? " bump" : "";
@@ -222,7 +243,7 @@ function viewTheory(args) {
             ${TYPE_FILTERS.filter((f) => th.view === "detail" || f.id !== "ex").map((f) => chip("type", f.id, `<span class="dot ${f.id}"></span>${f.label}`, th.types.includes(f.id))).join("")}
           </div></div>
           <div class="filter-row"><span class="flabel">Hét</span><div class="chips">
-            ${[1, 2, 3, 4].map((w) => chip("week", w, `${w}. hét`, th.weeks.includes(w))).join("")}
+            ${WEEKS.map((w) => chip("week", w, `${w}. hét`, th.weeks.includes(w))).join("")}
           </div></div>
         </div>
         <div id="tContent"></div>
@@ -601,16 +622,18 @@ function calcRender() {
           </div>`).join("")}
           <div class="row">
             <button type="submit" class="btn primary">Ellenőrzés</button>
+            ${pr.hint ? `<button type="button" class="btn" id="csHint">💡 Tipp</button>` : ""}
             <button type="button" class="btn" id="csSol">Megoldás mutatása</button>
             <span class="spacer"></span>
             ${cs.mode === "random" ? `<button type="button" class="btn" id="csNew">↻ Új számok</button>` : ""}
             <button type="button" class="btn" id="csNext">Következő →</button>
           </div>
         </form>
+        <div id="csHintBox"></div>
         <div id="csSolution"></div>
         <details class="help" style="margin-top:16px"><summary>Hogyan írjam be a választ?</summary>
           <p>Elég 3–4 tizedesjegy pontossággal megadni (pl. <code>0,2273</code>). Kifejezést is írhatsz, az oldal kiszámolja:
-          <code>1/72</code>, <code>0.85^3*0.15</code>, <code>1-e^-2</code>, <code>C(15;2)*0.08^2*0.92^13</code>, <code>11!</code>, <code>sqrt(2.15)</code>, <code>8%</code>.
+          <code>1/72</code>, <code>0.85^3*0.15</code>, <code>1-e^-2</code>, <code>C(15;2)*0.08^2*0.92^13</code>, <code>11!</code>, <code>sqrt(2.15)</code>, <code>8%</code>, <code>Phi(0,6)</code>, <code>invPhi(0,9)</code>.
           Tizedesvessző és -pont is jó; függvényen belül az argumentumokat <code>;</code> (vagy vessző) válassza el.</p>
         </details>
       </section>
@@ -649,10 +672,18 @@ function calcRender() {
   const showSol = () => {
     const el = document.getElementById("csSolution");
     el.innerHTML = `<div class="solution"><h4>Megoldás</h4>${b.sol}
+      ${(b.figs || []).length ? `<div class="figs">${b.figs.join("")}</div>` : ""}
       <ul class="answers">${b.parts.map((p) => `<li><b>${esc(p.label)}:</b> ${fmt(p.ans)}</li>`).join("")}</ul></div>`;
     renderMath(el);
   };
   document.getElementById("csSol").addEventListener("click", showSol);
+  const hb = document.getElementById("csHint");
+  if (hb) hb.addEventListener("click", () => {
+    const el = document.getElementById("csHintBox");
+    el.innerHTML = `<div class="hint-box"><b>💡 Tipp:</b> ${pr.hint}</div>`;
+    renderMath(el);
+    hb.disabled = true;
+  });
 
   app.querySelectorAll(".part input").forEach((inp) => inp.addEventListener("input", () => {
     const row = inp.closest(".part");
@@ -685,6 +716,318 @@ function calcRender() {
       showSol();
     }
     app.querySelector(".stat-pill").textContent = `Ebben a munkamenetben: ${cs.ok} / ${cs.tried} helyes`;
+  });
+}
+
+/* ───────────────────────── ZH ───────────────────────── */
+const zs = { exam: null, mode: null, answers: {}, submitted: false, start: 0, limit: 0, elapsed: 0, ti: 0, revealed: {}, results: {}, hints: {} };
+const zhTopic = (id) => (id === "elmelet" ? "Elmélet" : topicName(id));
+const taskPts = (t) => sum(t.parts.map((p) => p.pts || 1));
+const examPts = (ex) => sum(ex.tasks.map(taskPts));
+const mmss = (ms) => { const s = Math.max(0, Math.round(ms / 1000)); return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`; };
+
+function viewZH(args) {
+  const [id, mode, tn1] = args || [];
+  if (!id) return zhHome();
+  if (mode !== "vizsga" && mode !== "tanulo") { location.hash = "#/zh"; return; }
+  if (!zs.exam || zs.exam.id !== id || zs.mode !== mode) {
+    if (!zhStart(id, mode)) { location.hash = "#/zh"; return; }
+  }
+  if (mode === "tanulo" && tn1 && zs.exam.tasks[+tn1 - 1]) zs.ti = +tn1 - 1;
+  mode === "vizsga" ? zhExamRender() : zhLearnRender();
+}
+function zhStart(id, mode) {
+  const ex = id === "random" ? buildRandomExam() : EXAMS.find((e) => e.id === id);
+  if (!ex) return false;
+  Object.assign(zs, { exam: ex, mode, answers: {}, submitted: false, start: Date.now(), elapsed: 0, ti: 0, revealed: {}, results: {}, hints: {},
+    limit: mode === "vizsga" ? store.get("zhLimit", 0) : 0 });
+  return true;
+}
+function gradePart(p, a) {
+  if (a === undefined || a === "") return null;
+  if (p.choices) return a === p.ans;
+  try { return isClose(evaluate(a), p.ans); } catch (e) { return false; }
+}
+const answerText = (p) => (p.choices ? p.choices[p.ans] : fmt(p.ans, 4));
+
+/* ── közös építőelemek ── */
+function zhTaskHead(t, ti) {
+  return `<div class="zh-task-head"><span class="zh-num">${ti + 1}</span><h2>${t.title}</h2>
+    <span class="badge">${zhTopic(t.topic)}</span><span class="badge">${fmt(taskPts(t))} pont</span></div>
+    <div class="prob-text">${t.text}</div>${t.textFigs ? `<div class="figs">${t.textFigs().join("")}</div>` : ""}`;
+}
+function zhPartHtml(ti, pi, p, { locked = false, result = null, showAns = false } = {}) {
+  const key = `${ti}-${pi}`, a = zs.answers[key];
+  const cls = result === true ? " ok" : result === false ? " bad" : "";
+  const mark = result === true ? "✓" : result === false ? "✗" : "";
+  const fb = `<span class="fb${cls}">${mark}</span>`;
+  const helyes = showAns && result !== true ? `<div class="preview correct">Helyes: ${md(answerText(p))}</div>` : `<div class="preview"></div>`;
+  const label = `<label${p.choices ? "" : ` for="z${key}"`}>${esc(p.label)} <span class="pts">${fmt(p.pts || 1)} p</span></label>`;
+  if (p.choices) {
+    return `<div class="part choice${cls}" data-k="${key}">${label}<div class="seg choice-seg">${p.choices.map((c, ci) =>
+      `<button type="button" data-ci="${ci}" class="${a === ci ? "on" : ""}" ${locked ? "disabled" : ""}>${md(c)}</button>`).join("")}</div>${fb}${helyes}</div>`;
+  }
+  return `<div class="part${cls}" data-k="${key}">${label}<input type="text" id="z${key}" inputmode="decimal" autocomplete="off" value="${esc(a || "")}" ${locked ? "disabled" : ""} placeholder="pl. 0,25 vagy 1/4">${fb}${helyes}</div>`;
+}
+function zhWireParts(root, onChange) {
+  root.querySelectorAll(".part input").forEach((inp) => inp.addEventListener("input", () => {
+    const row = inp.closest(".part");
+    zs.answers[row.dataset.k] = inp.value;
+    row.classList.remove("ok", "bad");
+    row.querySelector(".fb").textContent = "";
+    const pv = row.querySelector(".preview");
+    pv.classList.remove("correct");
+    if (!inp.value.trim()) pv.textContent = "";
+    else { try { pv.textContent = "= " + fmt(evaluate(inp.value), 6); } catch (err) { pv.textContent = "⚠ " + err.message; } }
+    if (onChange) onChange();
+  }));
+  root.querySelectorAll(".choice-seg button").forEach((btn) => btn.addEventListener("click", () => {
+    const row = btn.closest(".part");
+    zs.answers[row.dataset.k] = +btn.dataset.ci;
+    row.querySelectorAll(".choice-seg button").forEach((x) => x.classList.toggle("on", x === btn));
+    row.classList.remove("ok", "bad");
+    row.querySelector(".fb").textContent = "";
+    if (onChange) onChange();
+  }));
+}
+function zhStepsHtml(t, n, animFrom = false) {
+  return `<ol class="steps">${t.steps.slice(0, n).map((s, si) => `<li class="step${s.note ? " note" : ""}${animFrom !== false && si >= animFrom ? " anim-swap" : ""}">
+    <div class="step-t">${s.t}</div><div class="step-b">${s.b}</div>${s.figs ? `<div class="figs">${s.figs().join("")}</div>` : ""}</li>`).join("")}</ol>`;
+}
+const zhAnswersHtml = (t) => `<div class="solution"><h4>Végeredmények</h4><ul class="answers">${t.parts.map((p) => `<li><b>${esc(p.label)}:</b> ${md(answerText(p))}</li>`).join("")}</ul></div>`;
+
+/* ── ZH főoldal ── */
+function zhHome() {
+  const best = store.get("zhBest", {});
+  const limit = store.get("zhLimit", 0);
+  const running = zs.exam && zs.mode === "vizsga" && !zs.submitted;
+  const card = (ex) => {
+    const topics = [...new Set(ex.tasks.map((t) => t.topic))];
+    return `<article class="panel zh-card anim-item">
+      <div><h3>${ex.title}</h3><div class="small muted">${ex.source}</div></div>
+      <div class="small">${ex.tasks.length} feladat · ${fmt(examPts(ex))} pont</div>
+      <div class="zh-topics">${topics.map((t) => `<span class="badge">${zhTopic(t)}</span>`).join("")}</div>
+      ${best[ex.id] !== undefined ? `<div class="small">Legjobb ZH-mód eredmény: <b>${best[ex.id]}%</b></div>` : ""}
+      <div class="row zh-card-btns"><a class="btn primary" href="#/zh/${ex.id}/vizsga">📝 ZH-mód</a><a class="btn" href="#/zh/${ex.id}/tanulo">📖 Tanuló mód</a></div>
+    </article>`;
+  };
+  mount(`
+    <h1>ZH-felkészülés</h1>
+    <p class="muted">Korábbi 1. zárthelyik feladatai, a hivatalos pontozással. Válaszd ki, hogyan szeretnél gyakorolni:</p>
+    <div class="zh-modes">
+      <div class="panel"><h3>📝 ZH-mód — segítség nélkül</h3><p class="small muted">Mint a valódi ZH-n: minden feladat egyben, választható időkorláttal, tipp és megoldás nélkül. A beadás után pontozást kapsz, és minden feladathoz megnézheted a részletes levezetést.</p>
+        <label class="small">Időkorlát: <select id="zhLimit">${[0, 45, 60, 90].map((m) => `<option value="${m}" ${m === limit ? "selected" : ""}>${m ? m + " perc" : "nincs (stopper)"}</option>`).join("")}</select></label></div>
+      <div class="panel"><h3>📖 Tanuló mód — levezetéssel</h3><p class="small muted">Feladatonként haladsz: azonnal ellenőrizheted a válaszaid, kérhetsz tippet, és lépésről lépésre kibonthatod a megoldást ábrákkal, grafikonokkal.</p></div>
+    </div>
+    ${running ? `<div class="panel zh-resume"><b>Folyamatban:</b> ${zs.exam.title} (ZH-mód) <span class="spacer"></span><a class="btn primary" href="#/zh/${zs.exam.id}/vizsga">Folytatás →</a></div>` : ""}
+    <div class="zh-grid">
+      ${EXAMS.map(card).join("")}
+      <article class="panel zh-card zh-card-random anim-item">
+        <div><h3>🎲 Véletlen próba-ZH</h3><div class="small muted">6 feladat a számolós feladatok generátoraiból (kombinatorika, Bayes, valószínűségi változó, nevezetes eloszlások, folytonos eloszlás) — minden indításkor új számokkal.</div></div>
+        ${best.random !== undefined ? `<div class="small">Legjobb ZH-mód eredmény: <b>${best.random}%</b></div>` : ""}
+        <div class="row zh-card-btns"><a class="btn primary zh-new" href="#/zh/random/vizsga">📝 ZH-mód</a><a class="btn zh-new" href="#/zh/random/tanulo">📖 Tanuló mód</a></div>
+      </article>
+    </div>`);
+  document.getElementById("zhLimit").addEventListener("change", (e) => store.set("zhLimit", +e.target.value));
+  app.querySelectorAll(".zh-new").forEach((x) => x.addEventListener("click", () => { zs.exam = null; }));
+}
+
+/* ── ZH-mód: segítség nélkül ── */
+function zhExamRender() {
+  const ex = zs.exam, total = examPts(ex), sub = zs.submitted;
+  let score = 0;
+  if (sub) ex.tasks.forEach((t, ti) => t.parts.forEach((p, pi) => { if (zs.results[`${ti}-${pi}`] === true) score += p.pts || 1; }));
+  const pct = Math.round((100 * score) / total);
+  const nParts = sum(ex.tasks.map((t) => t.parts.length));
+  mount(`
+    <div class="zh-bar">
+      <a class="btn small-btn" href="#/zh">← ZH-k</a>
+      <b class="zh-bar-title">${ex.title}</b>
+      <span class="spacer"></span>
+      <span class="stat-pill" id="zhTimer">⏱ ${sub ? mmss(zs.elapsed) : "00:00"}</span>
+      ${sub ? `<span class="stat-pill">${fmt(score)} / ${fmt(total)} pont</span>` : `<span class="stat-pill" id="zhProgress"></span><button class="btn primary" id="zhSubmit">Beadás</button>`}
+    </div>
+    ${sub ? `<div class="panel zh-result anim-swap">
+        <div class="score-big">${pct}%</div>
+        <p>${fmt(score)} / ${fmt(total)} pont · idő: ${mmss(zs.elapsed)}${zs.timeUp ? " (lejárt az idő)" : ""}</p>
+        <div class="tbl-scroll"><table class="mini zh-table"><tr><th>Feladat</th><th>Pont</th></tr>${ex.tasks.map((t, ti) => {
+          const got = sum(t.parts.map((p, pi) => (zs.results[`${ti}-${pi}`] === true ? p.pts || 1 : 0)));
+          return `<tr><td style="text-align:left"><a href="#zht${ti}" class="zh-jump" data-ti="${ti}">${ti + 1}. ${t.title}</a></td><td>${fmt(got)} / ${fmt(taskPts(t))}</td></tr>`;
+        }).join("")}</table></div>
+        <div class="row" style="justify-content:center;margin-top:12px">
+          <button class="btn primary" id="zhRetry">${ex.generated ? "Új próba-ZH" : "Újrakezdés"}</button>
+          ${ex.generated ? "" : `<a class="btn" href="#/zh/${ex.id}/tanulo">📖 Átnézem tanuló módban</a>`}
+        </div>
+      </div>`
+    : `<p class="muted small">Segítség nélküli mód: a válaszokat a végén, a <b>Beadás</b> gombbal ellenőrizheted. Számot vagy kifejezést is írhatsz (pl. <code>1/12</code>, <code>1-0,9^7</code>, <code>Phi(0,6)</code>).</p>`}
+    ${ex.tasks.map((t, ti) => {
+      const lost = sub && t.parts.some((p, pi) => zs.results[`${ti}-${pi}`] !== true);
+      return `<section class="panel zh-task" id="zht${ti}">
+        ${zhTaskHead(t, ti)}
+        <div class="parts">${t.parts.map((p, pi) => zhPartHtml(ti, pi, p, { locked: sub, result: sub ? zs.results[`${ti}-${pi}`] ?? false : null, showAns: sub })).join("")}</div>
+        ${sub ? `<details class="zh-sol"${lost ? " open" : ""}><summary>Részletes megoldás</summary>${zhStepsHtml(t, t.steps.length)}${zhAnswersHtml(t)}</details>` : ""}
+      </section>`;
+    }).join("")}
+    ${sub ? "" : `<div class="row"><span class="spacer"></span><button class="btn primary" id="zhSubmit2">Beadás</button></div>`}`);
+
+  if (sub) {
+    document.getElementById("zhRetry").addEventListener("click", () => { zhStart(ex.generated ? "random" : ex.id, "vizsga"); zhExamRender(); window.scrollTo(0, 0); });
+    app.querySelectorAll(".zh-jump").forEach((l) => l.addEventListener("click", (e) => {
+      e.preventDefault();
+      const el = document.getElementById("zht" + l.dataset.ti);
+      window.scrollTo({ top: el.getBoundingClientRect().top + scrollY - 130, behavior: "smooth" });
+    }));
+    return;
+  }
+  const progress = () => {
+    const n = Object.entries(zs.answers).filter(([, v]) => v !== "" && v !== undefined).length;
+    document.getElementById("zhProgress").textContent = `${n} / ${nParts} válasz`;
+    return n;
+  };
+  progress();
+  zhWireParts(app, progress);
+  const submit = (force) => {
+    const n = progress();
+    if (!force && n < nParts && !confirm(`Még ${nParts - n} válasz hiányzik. Biztosan beadod?`)) return;
+    ex.tasks.forEach((t, ti) => t.parts.forEach((p, pi) => { zs.results[`${ti}-${pi}`] = gradePart(p, zs.answers[`${ti}-${pi}`]); }));
+    zs.submitted = true;
+    zs.elapsed = Date.now() - zs.start;
+    let sc = 0;
+    ex.tasks.forEach((t, ti) => t.parts.forEach((p, pi) => { if (zs.results[`${ti}-${pi}`] === true) sc += p.pts || 1; }));
+    const best = store.get("zhBest", {});
+    const pc = Math.round((100 * sc) / examPts(ex));
+    if (best[ex.id] === undefined || pc > best[ex.id]) { best[ex.id] = pc; store.set("zhBest", best); }
+    if (viewCleanup) { viewCleanup(); viewCleanup = null; }
+    zhExamRender();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+  document.getElementById("zhSubmit").addEventListener("click", () => submit(false));
+  document.getElementById("zhSubmit2").addEventListener("click", () => submit(false));
+  /* időzítő: időkorlát esetén visszaszámol, és lejáratkor automatikusan bead */
+  const timerEl = document.getElementById("zhTimer");
+  const tickT = () => {
+    const el = Date.now() - zs.start;
+    if (zs.limit) {
+      const left = zs.limit * 60000 - el;
+      timerEl.textContent = "⏱ " + mmss(left);
+      timerEl.classList.toggle("warn", left < 5 * 60000);
+      if (left <= 0) { zs.timeUp = true; submit(true); }
+    } else timerEl.textContent = "⏱ " + mmss(el);
+  };
+  tickT();
+  const iv = setInterval(tickT, 1000);
+  viewCleanup = () => clearInterval(iv);
+}
+
+/* ── Tanuló mód: tipp, ellenőrzés, lépésenkénti levezetés ──
+   Csak feladatváltáskor rajzoljuk újra a teljes panelt; a gombok a panelnek csak a
+   megfelelő részét frissítik, így nem villan fel újra az egész (animáció). */
+const zlDone = (k) => zs.exam.tasks[k].parts.every((p, pi) => zs.results[`${k}-${pi}`] === true);
+function zlStepsWrapHtml(t, ti, animFrom = false) {
+  const shown = zs.revealed[ti] || 0, n = t.steps.length;
+  return `<div class="row zh-steps-head"><h3>Levezetés</h3><span class="muted small">${shown} / ${n} lépés</span><span class="spacer"></span>
+      ${shown < n ? `<button type="button" class="btn" data-act="next">${shown ? "Következő lépés" : "Első lépés"} →</button><button type="button" class="btn" data-act="all">Összes lépés</button>`
+        : `<button type="button" class="btn" data-act="hide">Elrejtés</button>`}
+    </div>
+    <div>${shown ? zhStepsHtml(t, shown, animFrom) : `<p class="muted small">Próbáld meg előbb egyedül! Ha elakadsz, kérj tippet, vagy bontsd ki a levezetést lépésenként.</p>`}</div>
+    ${shown === n ? `<div${animFrom !== false ? ' class="anim-swap"' : ""}>${zhAnswersHtml(t)}</div>` : ""}`;
+}
+/* a részkérdések jelzéseinek (✓/✗, „Helyes: …”) frissítése a helyükön */
+function zlUpdateParts(t, ti) {
+  const all = (zs.revealed[ti] || 0) === t.steps.length;
+  t.parts.forEach((p, pi) => {
+    const key = `${ti}-${pi}`, row = app.querySelector(`.part[data-k="${key}"]`);
+    if (!row) return;
+    const r = zs.results[key] ?? null;
+    row.classList.toggle("ok", r === true);
+    row.classList.toggle("bad", r === false);
+    const fb = row.querySelector(".fb");
+    fb.textContent = r === true ? "✓" : r === false ? "✗" : "";
+    fb.className = "fb" + (r === true ? " ok" : r === false ? " bad" : "");
+    const pv = row.querySelector(".preview");
+    if (all && r !== true) { pv.classList.add("correct"); pv.innerHTML = "Helyes: " + md(answerText(p)); renderMath(pv); }
+    else if (pv.classList.contains("correct")) { pv.classList.remove("correct"); pv.textContent = ""; }
+  });
+}
+function zlUpdateProgress() {
+  const ex = zs.exam;
+  document.getElementById("zlDone").textContent = `${ex.tasks.filter((_, k) => zlDone(k)).length} / ${ex.tasks.length} feladat kész`;
+  app.querySelectorAll(".zh-tab").forEach((b) => {
+    const k = +b.dataset.k, d = zlDone(k);
+    b.classList.toggle("done", d);
+    b.textContent = d ? "✓" : k + 1;
+  });
+}
+function zhLearnRender() {
+  const ex = zs.exam, ti = zs.ti, t = ex.tasks[ti];
+  mount(`
+    <div class="zh-bar">
+      <a class="btn small-btn" href="#/zh">← ZH-k</a>
+      <b class="zh-bar-title">${ex.title} · tanuló mód</b>
+      <span class="spacer"></span>
+      <span class="stat-pill" id="zlDone"></span>
+    </div>
+    <div class="zh-tabs">${ex.tasks.map((x, k) => `<button class="zh-tab${k === ti ? " on" : ""}" data-k="${k}" title="${esc(x.title)}">${k + 1}</button>`).join("")}</div>
+    <section class="panel zh-task anim-swap">
+      ${zhTaskHead(t, ti)}
+      <form class="parts" id="zlForm" autocomplete="off">
+        ${t.parts.map((p, pi) => zhPartHtml(ti, pi, p)).join("")}
+        <div class="row">
+          <button type="submit" class="btn primary">Ellenőrzés</button>
+          ${t.hint ? `<button type="button" class="btn" id="zlHint" ${zs.hints[ti] ? "disabled" : ""}>💡 Tipp</button>` : ""}
+        </div>
+      </form>
+      <div id="zlHintBox">${zs.hints[ti] ? `<div class="hint-box"><b>💡 Tipp:</b> ${t.hint}</div>` : ""}</div>
+      <div class="zh-steps-wrap" id="zlSteps">${zlStepsWrapHtml(t, ti)}</div>
+      <div class="row zh-nav">
+        <button class="btn" id="zlPrev" ${ti === 0 ? "disabled" : ""}>← Előző feladat</button>
+        <span class="spacer"></span>
+        <button class="btn" id="zlNext" ${ti === ex.tasks.length - 1 ? "disabled" : ""}>Következő feladat →</button>
+      </div>
+    </section>`);
+  zlUpdateParts(t, ti);
+  zlUpdateProgress();
+  const go = (k) => {
+    zs.ti = k;
+    history.replaceState(null, "", `#/zh/${ex.id}/tanulo/${k + 1}`);
+    zhLearnRender();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+  app.querySelectorAll(".zh-tab").forEach((b) => b.addEventListener("click", () => go(+b.dataset.k)));
+  document.getElementById("zlPrev").addEventListener("click", () => go(ti - 1));
+  document.getElementById("zlNext").addEventListener("click", () => go(ti + 1));
+  zhWireParts(app);
+  /* ellenőrzés: csak a mezők jelzései változnak */
+  document.getElementById("zlForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    t.parts.forEach((p, pi) => { zs.results[`${ti}-${pi}`] = gradePart(p, zs.answers[`${ti}-${pi}`]); });
+    zlUpdateParts(t, ti);
+    zlUpdateProgress();
+  });
+  /* tipp: csak a tippdoboz jelenik meg */
+  const hb = document.getElementById("zlHint");
+  if (hb) hb.addEventListener("click", () => {
+    zs.hints[ti] = true;
+    hb.disabled = true;
+    const box = document.getElementById("zlHintBox");
+    box.innerHTML = `<div class="hint-box"><b>💡 Tipp:</b> ${t.hint}</div>`;
+    renderMath(box);
+  });
+  /* levezetés: csak a levezetés-blokk frissül, és csak az új lépés úszik be */
+  const wrap = document.getElementById("zlSteps");
+  wrap.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-act]");
+    if (!b) return;
+    const prev = zs.revealed[ti] || 0, n = t.steps.length;
+    const next = b.dataset.act === "next" ? Math.min(n, prev + 1) : b.dataset.act === "all" ? n : 0;
+    zs.revealed[ti] = next;
+    wrap.innerHTML = zlStepsWrapHtml(t, ti, next > prev ? prev : false);
+    renderMath(wrap);
+    zlUpdateParts(t, ti);
+    if (next > prev) {
+      const first = wrap.querySelectorAll(".step")[prev];
+      if (first) first.scrollIntoView({ behavior: reduceMotion() ? "auto" : "smooth", block: "nearest" });
+    }
   });
 }
 

@@ -653,3 +653,315 @@ const PROBLEMS = [
     },
   },
 ];
+
+/* ═══════════════════ 5. hét: folytonos eloszlások ═══════════════════ */
+const xpow = (n) => (n === 1 ? "x" : `x^{${n}}`);
+const fracWord = { 2: "fele", 3: "harmada", 4: "negyede", 5: "ötöde" };
+PROBLEMS.push(
+  {
+    id: "poli", topic: "folyt", title: "Sűrűségfüggvény: c, E, D, medián", src: "Gy5/3",
+    fixed: { n: 1, b: 1, a: 0.5 },
+    random: () => { const b = rnd.int(1, 4); return { n: rnd.int(1, 3), b, a: b * rnd.pick([0.25, 0.5, 0.75]) }; },
+    build: ({ n, b, a }) => {
+      const c = (n + 1) / b ** (n + 1), E = ((n + 1) * b) / (n + 2), E2 = ((n + 1) * b * b) / (n + 3), D = Math.sqrt(E2 - E * E);
+      const Pa = (a / b) ** (n + 1), med = b * 0.5 ** (1 / (n + 1));
+      return {
+        text: R`Legyen $f(x)=c\,${xpow(n)}$, ha $0\lt x\lt ${b}$, máshol $f(x)=0$. (a) Mennyi $c$, hogy $f$ sűrűségfüggvény legyen? (b) Mennyi $E(X)$ és $D(X)$? (c) Mennyi $P(X\lt ${tn(a)})$? (d) Mi a medián?`,
+        parts: [
+          { label: "(a) c", ans: c },
+          { label: "(b) E(X)", ans: E },
+          { label: "(b) D(X)", ans: D },
+          { label: `(c) P(X < ${fmt(a)})`, ans: Pa },
+          { label: "(d) medián", ans: med },
+        ],
+        sol: R`(a) $\int_0^{${b}} c\,${xpow(n)}\,dx = c\cdot\frac{${b}^{${n + 1}}}{${n + 1}} = 1 \Rightarrow c = \frac{${n + 1}}{${b ** (n + 1)}} ${approx(c)}$ (és $f\ge0$ ✓).
+        <br>(b) $E(X)=\int_0^{${b}} x\cdot c\,${xpow(n)}\,dx = c\cdot\frac{${b}^{${n + 2}}}{${n + 2}} ${approx(E)}$, &nbsp; $E(X^2)=c\cdot\frac{${b}^{${n + 3}}}{${n + 3}} ${approx(E2)}$,
+        <br>$D^2(X)=E(X^2)-E^2(X) ${approx(E2 - E * E)}$, &nbsp; $D(X) ${approx(D)}$.
+        <br>(c) Eloszlásfüggvény a tartományon: $F(x)=\int_0^x c\,t^{${n}}\,dt=\left(\frac{x}{${b}}\right)^{${n + 1}}$, így $P(X\lt ${tn(a)})=F(${tn(a)}) ${approx(Pa)}$.
+        <br>(d) $F(m)=\frac12 \Rightarrow m = ${b}\cdot\left(\frac12\right)^{1/${n + 1}} ${approx(med)}$.`,
+      };
+    },
+  },
+  {
+    id: "pareto", topic: "folyt", title: "Sűrűségfüggvény $a/x^k$ alakban", src: "Gy5/17",
+    fixed: { k: 3, x0: 2, c: 3, d: 4 },
+    random: () => { const x0 = rnd.int(1, 3), c = x0 + rnd.int(1, 2); return { k: rnd.int(2, 4), x0, c, d: c + rnd.int(1, 3) }; },
+    build: ({ k, x0, c, d }) => {
+      const a = (k - 1) * x0 ** (k - 1), P = (x0 / c) ** (k - 1) - (x0 / d) ** (k - 1), med = x0 * 2 ** (1 / (k - 1));
+      const parts = [
+        { label: "(a) a", ans: a },
+        { label: `(b) P(${c} < ξ < ${d})`, ans: P },
+        { label: "(c) medián", ans: med },
+      ];
+      if (k > 2) parts.push({ label: "(d) E(ξ)", ans: ((k - 1) * x0) / (k - 2) });
+      return {
+        text: R`Egy $\xi$ valószínűségi változó sűrűségfüggvénye $f(x)=\frac{a}{x^{${k}}}$, ha $x\gt ${x0}$, máshol 0. (a) Mennyi $a$? (b) Írja fel az eloszlásfüggvényt, és számolja ki $P(${c}\lt\xi\lt ${d})$-t! (c) Milyen $x$-re lesz $P(\xi\gt x)=\frac12$ (medián)? (d) ${k > 2 ? "Mennyi $E(\\xi)$?" : "Létezik-e $E(\\xi)$?"}`,
+        parts,
+        sol: R`(a) $\int_{${x0}}^{\infty}\frac{a}{x^{${k}}}\,dx = a\left[\frac{x^{${1 - k}}}{${1 - k}}\right]_{${x0}}^{\infty} = \frac{a}{${k - 1}\cdot ${x0}^{${k - 1}}} = 1 \Rightarrow a = ${a}$.
+        <br>(b) $F(x)=\int_{${x0}}^{x}\frac{${a}}{t^{${k}}}\,dt = 1-\left(\frac{${x0}}{x}\right)^{${k - 1}}$, ha $x\gt ${x0}$ (különben 0). $P(${c}\lt\xi\lt ${d}) = F(${d})-F(${c}) ${approx(P)}$.
+        <br>(c) $\left(\frac{${x0}}{m}\right)^{${k - 1}}=\frac12 \Rightarrow m = ${x0}\cdot 2^{1/${k - 1}} ${approx(med)}$.
+        <br>(d) ${k > 2 ? R`$E(\xi)=\int_{${x0}}^\infty x\cdot\frac{${a}}{x^{${k}}}\,dx = \frac{${a}}{${k - 2}\cdot ${x0}^{${k - 2}}} ${approx(((k - 1) * x0) / (k - 2))}$.` : R`$\int_{${x0}}^\infty x\cdot\frac{${a}}{x^2}\,dx = ${a}\int_{${x0}}^\infty\frac{dx}{x} = \infty$, tehát a várható érték <b>nem létezik</b>.`}`,
+      };
+    },
+  },
+  {
+    id: "benzin", topic: "folyt", title: "Benzinkút: mekkora tartály kell?", src: "Gy5/6",
+    fixed: { n: 4, p: 0.01 },
+    random: () => ({ n: rnd.int(1, 5), p: rnd.pick([0.01, 0.02, 0.05, 0.1]) }),
+    build: ({ n, p }) => {
+      const t = 1 - p ** (1 / (n + 1));
+      return {
+        text: R`Egy benzinkút hetente egyszer kap benzint. A heti eladás (ezer literben) sűrűségfüggvénye $f(x)=${n + 1}(1-x)^{${n}}$, ha $0\lt x\lt1$, máshol 0. (a) Mekkora tartály kell ahhoz, hogy a kút egy adott héten csak $${tn(p)}$ valószínűséggel fogyjon ki? (b) Mennyi az átlagos heti eladás?`,
+        parts: [
+          { label: "(a) tartály (ezer liter)", ans: t },
+          { label: "(b) E(X)", ans: 1 / (n + 2) },
+        ],
+        sol: R`(a) Kifogy, ha az eladás nagyobb a tartálynál ($t$): $P(X\gt t)=\int_t^1 ${n + 1}(1-x)^{${n}}\,dx = (1-t)^{${n + 1}} = ${tn(p)}$, így $t = 1-${tn(p)}^{1/${n + 1}} ${approx(t)}$ ezer liter.
+        <br>(b) $E(X)=\int_0^1 x\cdot${n + 1}(1-x)^{${n}}\,dx = \frac{1}{${n + 2}} ${approx(1 / (n + 2))}$ (parciális integrálással vagy $u=1-x$ helyettesítéssel).`,
+      };
+    },
+  },
+  {
+    id: "egyenletes", topic: "folyteo", title: "Egyenletes eloszlás: várakozás a buszra", src: "Gy5/13",
+    fixed: { T: 30, w: 10, s: 15 },
+    random: () => {
+      const T = rnd.pick([20, 30, 40, 60]), w = 5 * rnd.int(1, T / 10);
+      return { T, w, s: 5 * rnd.int(1, Math.max(1, (T - w) / 5 - 1)) };
+    },
+    build: ({ T, w, s }) => ({
+      text: R`A busz 10:00 és ${T === 60 ? "11:00" : "10:" + T} között egyenletes eloszlású időpontban érkezik a megállóba, mi 10:00-ra megyünk ki. (a) Mi a valószínűsége, hogy legalább $${w}$ percet várunk? (b) Ha 10:${String(s).padStart(2, "0")}-kor még mindig várunk, mi a valószínűsége, hogy még legalább $${w}$ percet várunk? (c) Mennyi a várakozási idő várható értéke és szórása?`,
+      parts: [
+        { label: "(a)", ans: (T - w) / T },
+        { label: "(b)", ans: (T - s - w) / (T - s) },
+        { label: "(c) E(X)", ans: T / 2 },
+        { label: "(c) D(X)", ans: T / Math.sqrt(12) },
+      ],
+      sol: R`A várakozási idő $X\sim U[0;${T}]$ (percben).
+      <br>(a) $P(X\ge ${w}) = \frac{${T}-${w}}{${T}} ${approx((T - w) / T)}$.
+      <br>(b) $P(X\ge ${s + w}\mid X\gt ${s}) = \frac{P(X\ge ${s + w})}{P(X\gt ${s})} = \frac{${T - s - w}/${T}}{${T - s}/${T}} ${approx((T - s - w) / (T - s))}$. (Feltéve, hogy még nem jött meg, az érkezés a maradék $[${s};${T}]$-on egyenletes.)
+      <br>(c) $E(X)=\frac{0+${T}}{2}=${tn(T / 2)}$, &nbsp; $D(X)=\frac{${T}}{\sqrt{12}} ${approx(T / Math.sqrt(12))}$.`,
+    }),
+  },
+  {
+    id: "exp_alap", topic: "folyteo", title: "Exponenciális eloszlás: érkezések", src: "Gy5/23",
+    fixed: { mu: 40, a: 15, b: 30 },
+    random: () => { const mu = rnd.pick([10, 15, 20, 30, 40, 60]); return { mu, a: 5 * rnd.int(1, mu / 5), b: 5 * rnd.int(2, (2 * mu) / 5) }; },
+    build: ({ mu, a, b }) => {
+      const pa = 1 - Math.exp(-a / mu), pb = Math.exp(-b / mu), med = mu * Math.LN2;
+      return {
+        text: R`Egy baleseti sebészeten a betegek érkezése között eltelt idő exponenciális eloszlású, átlaga $${mu}$ perc. Mi a valószínűsége, hogy egy beteg érkezése után (a) $${a}$ percen belül érkezik a következő; (b) legalább $${b}$ percig nem jön újabb beteg? (c) Mennyi időn belül érkezik a betegek korán érkező fele (medián)?`,
+        parts: [
+          { label: `(a) P(X < ${a})`, ans: pa },
+          { label: `(b) P(X > ${b})`, ans: pb },
+          { label: "(c) medián (perc)", ans: med },
+        ],
+        sol: R`$\lambda=\frac{1}{${mu}}$ (perc⁻¹), $F(x)=1-e^{-x/${mu}}$.
+        <br>(a) $P(X\lt ${a})=1-e^{-${a}/${mu}} ${approx(pa)}$
+        <br>(b) $P(X\gt ${b})=e^{-${b}/${mu}} ${approx(pb)}$
+        <br>(c) $1-e^{-m/${mu}}=\frac12 \Rightarrow m=${mu}\ln 2 ${approx(med)}$ perc.`,
+      };
+    },
+  },
+  {
+    id: "exp_kvant", topic: "folyteo", title: "Exponenciális: túlélés és kvantilis", src: "Gy5/24",
+    fixed: { mu: 3, t: 4, qd: 3, r: 0.8 },
+    random: () => { const mu = rnd.pick([2, 3, 4, 5, 10]); return { mu, t: mu + rnd.int(1, mu), qd: rnd.int(2, 5), r: rnd.pick([0.5, 0.6, 0.75, 0.8, 0.9]) }; },
+    build: ({ mu, t, qd, r }) => {
+      const tq = mu * Math.log(qd), tr = -mu * Math.log(1 - r);
+      return {
+        text: R`Egy korallfaj polipjainak élettartama exponenciális eloszlású, átlagosan $${mu}$ év. (a) Az egyedek hány része él legfeljebb $${mu}$ évig? (b) Hány része éri meg a $${mu}$ évet? (c) Hány része éri meg a $${t}$ évet? (d) Hány év múlva lesz még életben éppen az egyedek ${fracWord[qd]}? (e) Hány év alatt pusztul el az egyedek $${tn(r * 100)}\%$-a?`,
+        parts: [
+          { label: `(a) P(X ≤ ${mu})`, ans: 1 - Math.exp(-1) },
+          { label: `(b) P(X > ${mu})`, ans: Math.exp(-1) },
+          { label: `(c) P(X > ${t})`, ans: Math.exp(-t / mu) },
+          { label: "(d) év", ans: tq },
+          { label: "(e) év", ans: tr },
+        ],
+        sol: R`$\lambda=\frac1{${mu}}$, $P(X\gt x)=e^{-x/${mu}}$.
+        <br>(a) $1-e^{-1} ${approx(1 - Math.exp(-1))}$ — az átlagnál tovább csak kb. 37% él!
+        <br>(b) $e^{-1} ${approx(Math.exp(-1))}$
+        <br>(c) $e^{-${t}/${mu}} ${approx(Math.exp(-t / mu))}$
+        <br>(d) $e^{-x/${mu}}=\frac1{${qd}} \Rightarrow x=${mu}\ln ${qd} ${approx(tq)}$ év
+        <br>(e) $1-e^{-x/${mu}}=${tn(r)} \Rightarrow x=-${mu}\ln ${tn(1 - r)} ${approx(tr)}$ év`,
+      };
+    },
+  },
+  {
+    id: "exp_orok", topic: "folyteo", title: "Exponenciális: örökifjú tulajdonság", src: "Gy5/25–26",
+    fixed: { lam: 0.2, t: 3, s: 5, a: 4, q: 0.25 },
+    random: () => ({ lam: rnd.pick([0.1, 0.2, 0.25, 0.5]), t: rnd.int(1, 5), s: rnd.int(2, 8), a: rnd.int(2, 6), q: rnd.pick([0.2, 0.25, 0.4, 0.5, 0.6]) }),
+    build: ({ lam, t, s, a, q }) => {
+      const p = Math.exp(-lam * t);
+      return {
+        text: R`Egy alkatrész élettartama (években) $${tn(lam)}$ paraméterű exponenciális eloszlású. (a) Mi a valószínűsége, hogy az élettartam meghaladja a $${t}$ évet? (b) Feltéve, hogy már $${s}$ éve működik, mi a valószínűsége, hogy további $${t}$ évig is használható? (c) Egy másik (szintén exponenciális élettartamú) izzófajtánál a darabok $${tn(q * 100)}\%$-a éli túl a $${a}$ évet. Hány százalékuk éli túl a $${2 * a}$ évet?`,
+        parts: [
+          { label: `(a) P(X > ${t})`, ans: p },
+          { label: `(b) P(X > ${s + t} | X > ${s})`, ans: p },
+          { label: `(c) P(Y > ${2 * a})`, ans: q * q },
+        ],
+        sol: R`(a) $P(X\gt ${t})=e^{-${tn(lam)}\cdot ${t}} ${approx(p)}$
+        <br>(b) $P(X\gt ${s + t}\mid X\gt ${s})=\frac{e^{-${tn(lam)}\cdot${s + t}}}{e^{-${tn(lam)}\cdot${s}}}=e^{-${tn(lam)}\cdot${t}} ${approx(p)}$ — ugyanannyi, mint (a): az exponenciális eloszlás <b>örökifjú</b>.
+        <br>(c) $P(Y\gt ${2 * a})=e^{-2\lambda\cdot${a}}=\left(e^{-\lambda\cdot${a}}\right)^2=${tn(q)}^2 ${approx(q * q)}$, azaz $${tn(q * q * 100)}\%$. ($\lambda$-t ki sem kell számolni.)`,
+      };
+    },
+  },
+  {
+    id: "exp_min", topic: "folyteo", title: "Két foglalt telefonfülke (minimum)", src: "Gy5/27",
+    fixed: { m1: 10, m2: 5, t: 5 },
+    random: () => ({ m1: rnd.pick([4, 5, 6, 8, 10, 12, 15]), m2: rnd.pick([2, 3, 4, 5, 6]), t: rnd.int(1, 6) }),
+    build: ({ m1, m2, t }) => {
+      const l = 1 / m1 + 1 / m2;
+      return {
+        text: R`Telefonálni szeretnék, de mindkét fülke foglalt. Az egyikben a beszélgetés hossza exponenciális, átlagosan $${m1}$ perc, a másikban (tőle függetlenül) exponenciális, átlagosan $${m2}$ perc. Amint valamelyik felszabadul, bemegyek. (a) Átlagosan mennyit várok? (b) Mi a valószínűsége, hogy $${t}$ percnél többet várok?`,
+        parts: [
+          { label: "(a) E(T) (perc)", ans: 1 / l },
+          { label: `(b) P(T > ${t})`, ans: Math.exp(-l * t) },
+        ],
+        sol: R`A várakozás $T=\min(X,Y)$. $P(T\gt t)=P(X\gt t)\,P(Y\gt t)=e^{-t/${m1}}e^{-t/${m2}}=e^{-(\frac1{${m1}}+\frac1{${m2}})t}$, tehát $T\sim\text{Exp}(\lambda)$, $\lambda=\frac1{${m1}}+\frac1{${m2}} ${approx(l)}$.
+        <br>(a) $E(T)=\frac1\lambda ${approx(1 / l)}$ perc
+        <br>(b) $P(T\gt ${t})=e^{-${tn(l)}\cdot ${t}} ${approx(Math.exp(-l * t))}$`,
+      };
+    },
+  },
+  {
+    id: "normalis", topic: "folyteo", title: "Normális eloszlás: tejhozam", src: "Gy5/28",
+    fixed: { m: 22.1, s: 1.5, a: 23, b: 25, q1: 0.7, q2: 0.4 },
+    random: () => {
+      const m = rnd.step(15, 30, 0.1), s = rnd.step(0.8, 3, 0.1);
+      const a = +(m + s * rnd.pick([-1, -0.5, 0.4, 0.6, 1])).toFixed(1);
+      return { m, s, a, b: +(a + s * rnd.pick([1, 1.5, 2])).toFixed(1), q1: rnd.pick([0.6, 0.7, 0.8, 0.9]), q2: rnd.pick([0.2, 0.3, 0.4]) };
+    },
+    build: ({ m, s, a, b, q1, q2 }) => {
+      const za = (a - m) / s, zb = (b - m) / s;
+      const x1 = m + s * invPhi(q1), x2 = m + s * invPhi(q2);
+      return {
+        text: R`Egy tehén napi tejhozama normális eloszlású, $m=${tn(m)}$ liter várható értékkel és $\sigma=${tn(s)}$ liter szórással. Mi a valószínűsége, hogy egy adott napon a tejhozam (a) kevesebb, mint $${tn(a)}$ liter; (b) több, mint $${tn(b)}$ liter; (c) $${tn(a)}$ és $${tn(b)}$ liter közé esik; (d) $m-\sigma$ és $m+\sigma$ közé esik? (e) Legfeljebb mennyi tejet ad a legkevésbé tejelő napok $${tn(q1 * 100)}\%$-a? (f) És $${tn(q2 * 100)}\%$-a?`,
+        parts: [
+          { label: `(a) P(X < ${fmt(a)})`, ans: Phi(za) },
+          { label: `(b) P(X > ${fmt(b)})`, ans: 1 - Phi(zb) },
+          { label: "(c)", ans: Phi(zb) - Phi(za) },
+          { label: "(d)", ans: 2 * Phi(1) - 1 },
+          { label: `(e) ${fmt(q1)}-kvantilis`, ans: x1 },
+          { label: `(f) ${fmt(q2)}-kvantilis`, ans: x2 },
+        ],
+        sol: R`Standardizálás: $P(X\lt x)=\Phi\left(\frac{x-${tn(m)}}{${tn(s)}}\right)$.
+        <br>(a) $z=\frac{${tn(a)}-${tn(m)}}{${tn(s)}} ${approx(za, 4)}$, $\Phi(${tn(za, 4)}) ${approx(Phi(za))}$
+        <br>(b) $z ${approx(zb, 4)}$, $1-\Phi(${tn(zb, 4)}) ${approx(1 - Phi(zb))}$
+        <br>(c) $\Phi(${tn(zb, 4)})-\Phi(${tn(za, 4)}) ${approx(Phi(zb) - Phi(za))}$
+        <br>(d) $\Phi(1)-\Phi(-1)=2\Phi(1)-1 ${approx(2 * Phi(1) - 1)}$ (független $m$-től és $\sigma$-tól!)
+        <br>(e) $\Phi(z)=${tn(q1)} \Rightarrow z=\Phi^{-1}(${tn(q1)}) ${approx(invPhi(q1), 4)}$, $x=${tn(m)}+${tn(s)}\cdot ${tn(invPhi(q1), 4)} ${approx(x1)}$ liter
+        <br>(f) $z=\Phi^{-1}(${tn(q2)})=-\Phi^{-1}(${tn(1 - q2)}) ${approx(invPhi(q2), 4)}$, $x ${approx(x2)}$ liter`,
+      };
+    },
+  },
+  {
+    id: "normalis2", topic: "folyteo", title: "Normális eloszlás: testmagasság", src: "Gy5/29",
+    fixed: { m: 180, s: 20, lo: 160, hi: 190, pl: 0.1, ph: 0.2 },
+    random: () => {
+      const m = rnd.int(160, 185), s = rnd.int(6, 15);
+      return { m, s, lo: m - s * rnd.pick([1, 1.5, 2]), hi: m + rnd.int(1, 2) * 5, pl: rnd.pick([0.05, 0.1, 0.2]), ph: rnd.pick([0.1, 0.2, 0.25]) };
+    },
+    build: ({ m, s, lo, hi, pl, ph }) => {
+      const zl = (lo - m) / s, zh = (hi - m) / s, xl = m + s * invPhi(pl), xh = m + s * invPhi(1 - ph);
+      return {
+        text: R`Egy populációban a férfiak testmagassága normális eloszlású, átlaga $${m}$ cm, szórása $${s}$ cm. Mi a valószínűsége, hogy egy véletlenszerűen választott férfi (a) $${tn(lo)}$ cm-nél alacsonyabb; (b) $${hi}$ cm-nél magasabb; (c) $${tn(lo)}$ és $${hi}$ cm közötti? (d) Melyik magasság alatt van a férfiak $${tn(pl * 100)}\%$-a? (e) Melyik magasság fölött van a férfiak $${tn(ph * 100)}\%$-a?`,
+        parts: [
+          { label: `(a) P(X < ${fmt(lo)})`, ans: Phi(zl) },
+          { label: `(b) P(X > ${hi})`, ans: 1 - Phi(zh) },
+          { label: "(c)", ans: Phi(zh) - Phi(zl) },
+          { label: "(d) cm", ans: xl },
+          { label: "(e) cm", ans: xh },
+        ],
+        sol: R`(a) $\Phi\left(\frac{${tn(lo)}-${m}}{${s}}\right)=\Phi(${tn(zl, 4)})=1-\Phi(${tn(-zl, 4)}) ${approx(Phi(zl))}$
+        <br>(b) $1-\Phi\left(\frac{${hi}-${m}}{${s}}\right)=1-\Phi(${tn(zh, 4)}) ${approx(1 - Phi(zh))}$
+        <br>(c) $\Phi(${tn(zh, 4)})-\Phi(${tn(zl, 4)}) ${approx(Phi(zh) - Phi(zl))}$
+        <br>(d) $F(x)=${tn(pl)}$: $x=${m}+${s}\cdot\Phi^{-1}(${tn(pl)})=${m}-${s}\cdot ${tn(-invPhi(pl), 4)} ${approx(xl)}$ cm
+        <br>(e) $P(X\gt x)=${tn(ph)} \Leftrightarrow F(x)=${tn(1 - ph)}$: $x=${m}+${s}\cdot ${tn(invPhi(1 - ph), 4)} ${approx(xh)}$ cm`,
+      };
+    },
+  },
+  {
+    id: "talalkozo2", topic: "folyteo", title: "Találkozó eltérő várakozással", src: "Gy5/21",
+    fixed: { T: 60, w: 10, wa: 15, wb: 5 },
+    random: () => ({ T: 60, w: 5 * rnd.int(1, 6), wa: 5 * rnd.int(1, 6), wb: 5 * rnd.int(1, 6) }),
+    build: ({ T, w, wa, wb }) => {
+      const pa = ((T - w) / T) ** 2, pm = 1 - ((T - wa) ** 2 + (T - wb) ** 2) / (2 * T * T);
+      return {
+        text: R`Aladár és Bori 9 és 10 óra között, egymástól függetlenül, teljesen véletlen időpontban érkezik a megbeszélt helyre. (a) Mekkora a valószínűsége, hogy az előbb érkezőnek $${w}$ percnél többet kell várnia a másikra? (b) Megérkezése után Aladár $${wa}$ percet vár, Bori $${wb}$ percet. Mekkora a valószínűsége, hogy találkoznak?`,
+        parts: [
+          { label: "(a)", ans: pa },
+          { label: "(b)", ans: pm },
+        ],
+        sol: R`Legyen $x$ Aladár, $y$ Bori érkezése percben: $(x,y)$ egyenletes a $[0;${T}]^2$ négyzetben (terület $${T * T}$).
+        <br>(a) $|x-y|\gt ${w}$: két egybevágó derékszögű háromszög, befogóik $${T - w}$: $P=\frac{2\cdot\frac12\cdot${T - w}^2}{${T}^2}=\left(\frac{${T - w}}{${T}}\right)^2 ${approx(pa)}$
+        <br>(b) Találkoznak, ha Aladár ér oda előbb és $y-x\le ${wa}$, vagy Bori ér oda előbb és $x-y\le ${wb}$. A kedvezőtlen részek: háromszög $${T - wa}$ és $${T - wb}$ befogóval: $$P = 1-\frac{\frac12\cdot${T - wa}^2+\frac12\cdot${T - wb}^2}{${T}^2} ${approx(pm)}$$`,
+      };
+    },
+  },
+  {
+    id: "osszeg2", topic: "folyteo", title: "Két véletlen szám összege", src: "Gy5/22",
+    fixed: { L: 2, c1: 1, c2: 2 },
+    random: () => {
+      const L = rnd.int(1, 4), steps = range(1, 7).map((i) => (i * L) / 4);
+      const c1 = rnd.pick(steps.slice(0, 5));
+      return { L, c1, c2: rnd.pick(steps.filter((x) => x > c1)) };
+    },
+    build: ({ L, c1, c2 }) => {
+      const A = (c) => (c <= L ? (c * c) / 2 : L * L - ((2 * L - c) ** 2) / 2);
+      const P = (A(c2) - A(c1)) / (L * L);
+      return {
+        text: R`A $[0;${L}]$ intervallumból teljesen véletlenszerűen, egymástól függetlenül választunk két számot. Mi a valószínűsége, hogy az összegük nagyobb $${tn(c1)}$-nél, de kisebb $${tn(c2)}$-nél?`,
+        parts: [{ label: "P", ans: P }],
+        sol: R`$(x,y)$ egyenletes a $[0;${L}]^2$ négyzetben (terület $${L * L}$). Az $x+y\lt c$ rész területe: ha $c\le ${L}$, akkor $\frac{c^2}{2}$ (háromszög); ha $c\gt ${L}$, akkor $${L * L}-\frac{(${2 * L}-c)^2}{2}$.
+        <br>$T(${tn(c2)}) ${approx(A(c2))}$, $T(${tn(c1)}) ${approx(A(c1))}$, így $$P=\frac{T(${tn(c2)})-T(${tn(c1)})}{${L * L}} ${approx(P)}$$`,
+      };
+    },
+  },
+);
+
+/* Tippek (a Számolás oldalon és a ZH tanuló módjában) */
+const PROBLEM_HINTS = {
+  kerek: R`Körpermutáció: egy embert rögzíts, a többiek sorrendje számít: $(n-1)!$.`,
+  lepes: R`Írd fel: előre + hátra = lépésszám, előre − hátra = a cél. Ebből megvan, hány lépés megy hátra; ezeket kell kiválasztani.`,
+  levelek: R`Különböző tárgyak → variáció, egyforma tárgyak → kombináció. Ha egy ládába több is kerülhet → ismétléses.`,
+  dijak: R`Különböző díjak → számít, ki melyiket kapja (variáció); egyforma díjak → csak a nyertesek halmaza számít (kombináció).`,
+  szo: R`Ismétléses permutáció: $n!$ osztva az egyforma betűk darabszámának faktoriálisaival.`,
+  kockaosszeg: R`Összes eset $6^3$ (a sorrend számít). Keresd meg, mely számhármasok adják az összeget, és mindegyiknek hány sorrendje van.`,
+  egymasmellett: R`Rögzítsd A helyét: B-nek hány hely marad, és ebből hány szomszédos?`,
+  urna: R`Visszatevéssel: binomiális. Visszatevés nélkül: hipergeometriai (kombinációk aránya).`,
+  lotto: R`Hipergeometriai: a kihúzott számokból $k$ a mieink közül, a többi a maradékból jön.`,
+  kocka6: R`Összes eset $6^n$. „Mind különböző”: ismétlés nélküli variáció; „pontosan két 6-os”: binomiális.`,
+  talalkozo: R`Ábrázold az érkezéseket az $(x,y)$ négyzetben; a találkozás feltétele $|x-y|\le w$. A kedvezőtlen rész két háromszög.`,
+  alap: R`$P(A+B)=P(A)+P(B)-P(AB)$, $P(A-B)=P(A)-P(AB)$, komplementer: $1-P$, és De Morgan.`,
+  feltab: R`Szorzási szabály: $P(AB)=P(B|A)P(A)$, aztán $P(B)=P(AB)/P(A|B)$.`,
+  kontingencia: R`Feltételes valószínűségnél a feltételnek megfelelő sor vagy oszlop összege a nevező.`,
+  teljes3: R`Fa-diagram: első szint a „honnan” (gép/csoport), második a megfigyelt esemény. (a) teljes valószínűség, (b) Bayes.`,
+  bayes2: R`$P(E)=P(E|H)P(H)+P(E|\overline H)P(\overline H)$, majd Bayes: a kérdéses ág osztva $P(E)$-vel.`,
+  gepall: R`Teljes valószínűség az időarányokkal; a (b)-ben a feltétel a „dolgozik”, a nevező $1-P(\text{áll})$.`,
+  tabla: R`$F(c)=P(X\lt c)$: csak a szigorúan kisebb értékeket add össze. $E=\sum x_ip_i$, $D^2=E(X^2)-E^2(X)$.`,
+  amig: R`$P(\xi=k)$: előbb $k-1$ fehér, aztán piros (szorzási szabály). Transzformációnál kell $E(\xi^2)$ és $E(\xi^4)$.`,
+  busz: R`Diákot választva egy busz a létszámával arányos eséllyel jön ki: $P(\xi=n)=n/N$; sofőrt választva mind egyforma eséllyel.`,
+  szabo: R`A szükséges vizsgák száma geometriai: $P(X\le k)=1-(1-p)^k$.`,
+  blicc: R`Egy napon elkapják = (van ellenőr)·(elkapja). A napok függetlenek → hatványozás, binomiális.`,
+  binom: R`Független próbák, állandó $p$: binomiális, $P(X=k)=\binom nk p^k(1-p)^{n-k}$.`,
+  hipergeo: R`Visszatevés nélkül, véges készletből: hipergeometriai, $E=n\frac KN$.`,
+  geo: R`Az első sikerig: geometriai, $P(X=k)=(1-p)^{k-1}p$, $P(X\le m)=1-(1-p)^m$.`,
+  poisson: R`Poisson; a $\lambda$-t skálázd az időtartamhoz. „Legalább 1”: $1-e^{-\lambda}$.`,
+  poisinv: R`$P(X=0)=e^{-\lambda}$, ebből $\lambda=-\ln P(X=0)$.`,
+  kulcs: R`Visszatevéssel: geometriai. Eldobva: a jó kulcs helye egyenletes az $1,\dots,n$ között.`,
+  pistike: R`Binomiális: számold ki, legalább hány jó válasz kell, és add össze a valószínűségeket onnan $n$-ig.`,
+  vegyes: R`Időtartam alatti darabszám → Poisson; rögzített számú független próba → binomiális; „az első…” → geometriai; visszatevés nélkül → hipergeometriai.`,
+  poli: R`$\int f=1$-ből $c$; $E=\int xf$, $E(X^2)=\int x^2f$; a medián: $F(m)=\frac12$.`,
+  pareto: R`$\int_{x_0}^\infty a\,x^{-k}dx=1$; az eloszlásfüggvény integrálással jön; $E$ csak akkor létezik, ha $\int xf$ véges.`,
+  benzin: R`Kifogy, ha az eladás több a tartálynál: $P(X\gt t)=\int_t^1 f=0{,}01$, ezt oldd meg $t$-re.`,
+  egyenletes: R`Egyenletes eloszlás: a valószínűség a hosszak aránya. Feltételesnél a maradék intervallum egyenletes.`,
+  exp_alap: R`$\lambda=\frac1{\text{átlag}}$; $P(X\lt a)=1-e^{-\lambda a}$, $P(X\gt b)=e^{-\lambda b}$, medián $\frac{\ln2}\lambda$.`,
+  exp_kvant: R`Túlélés: $P(X\gt t)=e^{-t/\mu}$. Kvantilis: oldd meg $e^{-t/\mu}=q$-t, azaz $t=-\mu\ln q$.`,
+  exp_orok: R`Örökifjú: $P(X\gt s+t\mid X\gt s)=P(X\gt t)$. És $P(X\gt2a)=P(X\gt a)^2$.`,
+  exp_min: R`A várakozás a két idő minimuma, ami $\text{Exp}(\lambda_1+\lambda_2)$ eloszlású.`,
+  normalis: R`Standardizálj: $z=\frac{x-m}{\sigma}$, majd $\Phi(z)$; kvantilis: $x=m+\sigma\,\Phi^{-1}(p)$.`,
+  normalis2: R`Standardizálj, negatív $z$-nél $\Phi(-z)=1-\Phi(z)$; „fölötte van a 20%” ⇔ $F(x)=0{,}8$.`,
+  talalkozo2: R`$[0;60]^2$ négyzet; „$w$ percnél többet vár” ⇔ $|x-y|\gt w$. Eltérő várakozásnál a két háromszög befogója is eltér.`,
+  osszeg2: R`Rajzold be a négyzetbe az $x+y=c$ egyeneseket; a kedvező rész a két egyenes közötti sáv.`,
+};
+PROBLEMS.forEach((p) => { if (PROBLEM_HINTS[p.id]) p.hint = PROBLEM_HINTS[p.id]; });
